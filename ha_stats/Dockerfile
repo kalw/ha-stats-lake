@@ -4,11 +4,12 @@ FROM ${BUILD_FROM}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install rclone and Python dependencies
 # hadolint ignore=DL3018
-RUN apk add --no-cache rclone
+RUN apk add --no-cache rclone build-base cmake
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --requirement /tmp/requirements.txt
+# Remove build tools after compiling duckdb (no musl/aarch64 pre-built wheel)
+RUN pip3 install --no-cache-dir --requirement /tmp/requirements.txt \
+    && apk del build-base cmake
 
 COPY ha_stats.py /app/ha_stats.py
 COPY rootfs /
