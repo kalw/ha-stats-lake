@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the HA Stats Lake service
+# ==============================================================================
+bashio::log.info "Starting HA Stats Lake..."
+exec python3 /app/ha_stats.py

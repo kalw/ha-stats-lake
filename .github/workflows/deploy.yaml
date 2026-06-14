@@ -1,0 +1,16 @@
+---
+name: Deploy
+
+# yamllint disable-line rule:truthy
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  workflows:
+    uses: hassio-addons/workflows/.github/workflows/addon-deploy.yaml@main
+    with:
+      repository: "hassio-addons"
+    secrets:
+      DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
