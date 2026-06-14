@@ -11,16 +11,17 @@ Optionally syncs the raw CSVs to any `rclone` remote as a cold backup.
 ## Repository layout
 
 ```
-ha_stats/               ← the add-on directory (slug: ha_stats_lake)
-  config.yaml           ← HA add-on manifest + options schema
-  Dockerfile            ← multi-stage Alpine build
-  run.sh                ← container entrypoint
-  ha_stats.py           ← asyncio app; talks to HA via Supervisor REST API
-  requirements.txt      ← aiohttp, duckdb
+ha_stats/                                  ← the add-on directory (slug: ha_stats_lake)
+  config.yaml                              ← HA add-on manifest + options schema
+  build.yaml                               ← per-arch base image mapping
+  Dockerfile                               ← single-stage Alpine build
+  ha_stats.py                              ← asyncio app; talks to HA via Supervisor REST API
+  requirements.txt                         ← aiohttp, duckdb
+  rootfs/etc/services.d/ha-stats/run       ← s6-overlay service script (replaces CMD)
 
 .github/workflows/
-  ci.yaml               ← ruff lint + multi-arch Docker build-only on every PR
-  publish-docker.yaml   ← push to GHCR on v* tags / workflow_dispatch
+  ci.yaml                                  ← delegates to hassio-addons/workflows addon-ci on every PR/push
+  deploy.yaml                              ← delegates to hassio-addons/workflows addon-deploy on published releases
 ```
 
 ## Add-on runtime contract
@@ -47,16 +48,22 @@ Never hardcode paths outside `/data/`.
 - **Optional features degrade gracefully** — if `r2_bucket` or
   `onedrive_remote` is empty the corresponding path logs an info message and
   returns; it must never crash the main loop.
+- **s6-overlay entrypoint** — the container is started by
+  `rootfs/etc/services.d/ha-stats/run`, not a `CMD` or `ENTRYPOINT` in the
+  Dockerfile. Do not add a `CMD` instruction; s6 is baked into the HA base
+  images.
 
 ## Build, container & CI
 
-`uv` is used for local dependency management. The add-on image is a two-stage
-Alpine build: Python deps installed into a venv in the build stage, copied into
-a slim runtime that also includes the `rclone` binary.
+The add-on image is a **single-stage Alpine** build. `build-base` and `cmake`
+are installed before pip (required to compile `duckdb` from source on aarch64,
+which has no pre-built musl wheel) and removed in the same `RUN` layer. `rclone`
+is installed via apk and stays at runtime.
 
 ```bash
 # local image build (amd64, for smoke-testing)
-docker build -t ha-stats-lake:dev ha_stats/
+docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.18 \
+  -t ha-stats-lake:dev ha_stats/
 
 # verify the app imports cleanly (no HA token needed for import check)
 docker run --rm ha-stats-lake:dev python -c "import ha_stats; print('ok')"
@@ -64,17 +71,17 @@ docker run --rm ha-stats-lake:dev python -c "import ha_stats; print('ok')"
 
 GitHub Actions:
 
-- `ci.yaml` — ruff lint + multi-arch Docker build (no push) on every PR and
-  every push to `main`. Targets: `linux/amd64`, `linux/arm64`, `linux/arm/v7`.
-- `publish-docker.yaml` — pushes
-  `ghcr.io/<owner>/ha-stats:<version>` and `:latest` to GHCR on `v*` tags or
-  `workflow_dispatch` (for manual re-publishes of a specific tag).
+- `ci.yaml` — delegates to `hassio-addons/workflows/.github/workflows/addon-ci.yaml@main`.
+  Runs linters (yamllint, prettier, hadolint, shellcheck), validates the HA addon
+  manifest, and performs Docker builds (no push) for `aarch64` and `amd64` on
+  every PR and push to `main`.
+- `deploy.yaml` — delegates to `hassio-addons/workflows/.github/workflows/addon-deploy.yaml@main`.
+  Fires only on **published** GitHub Releases; pushes the multi-arch image to
+  GHCR and triggers `kalw/hassio-addons` via `repository_dispatch`.
 
-Dependabot tracks pip (inside `ha_stats/`) and github-actions.
-
-The version in `ha_stats/config.yaml` must match the git tag pushed for a
-release (`v0.2.0` → `version: "0.2.0"`). Keep them in sync; see release flow
-below.
+Supported architectures: **aarch64**, **amd64**. The deprecated arches
+(`armhf`, `armv7`, `i386`) were dropped in HA 2025.12 and must not be
+re-added.
 
 ## Git workflow
 
@@ -152,9 +159,14 @@ run `gh pr create --fill`.
 
 ### Release flow
 
-Releases are manual (no release-please bot). Steps:
+Releases are manual (no release-please bot). The HA addon linter requires
+`version: "dev"` in the repo at all times; the version is only bumped for the
+release commit and immediately reset afterward.
 
-1. Bump `version` in `ha_stats/config.yaml` to the next semver (e.g. `"0.2.0"`).
+Steps:
+
+1. Bump `version` in `ha_stats/config.yaml` from `"dev"` to the next semver
+   (e.g. `"0.2.0"`).
 2. Commit: `chore: release 0.2.0`.
 3. Open a PR, get it merged to `main`.
 4. After merge, tag `main`:
@@ -164,22 +176,28 @@ Releases are manual (no release-please bot). Steps:
    git tag v0.2.0
    git push origin v0.2.0
    ```
-5. `publish-docker.yaml` fires automatically:
-   - pushes the multi-arch image to GHCR (`ha-stats:0.2.0` and `ha-stats:latest`)
-   - dispatches an `update` event to `kalw/hassio-addons`, triggering the
-     `repository-updater` there to pull the new `config.yaml` and refresh the
-     addon listing
-6. Create a GitHub Release from the tag with a short changelog bullet list.
+5. `deploy.yaml` fires automatically on the published release:
+   - pushes the multi-arch image to GHCR (`ghcr.io/kalw/ha_stats_lake/<arch>:<version>`)
+   - dispatches an `update` event to `kalw/hassio-addons` via `DISPATCH_TOKEN`,
+     triggering the `repository-updater` to refresh the add-on listing
+6. Reset `version` back to `"dev"` in `ha_stats/config.yaml`, commit and merge
+   via PR.
+7. Create a GitHub Release from the tag with a short changelog bullet list.
 
 **Do not** push version tags before the PR is merged to `main`.
 **Do not** create GitHub Releases by hand before the Docker publish succeeds.
 
 ### One-time secrets setup (human steps, done once per repo)
 
-`publish-docker.yaml` needs a `DISPATCH_TOKEN` secret — a GitHub PAT with
-`repo` scope on `kalw/hassio-addons` — to trigger the repository updater.
+`deploy.yaml` needs a `DISPATCH_TOKEN` secret — a GitHub PAT with `repo` scope
+on `kalw/hassio-addons` — to trigger the repository updater.
 
-Repository → Settings → Secrets and variables → Actions → **New repository secret**:
+```bash
+gh secret set DISPATCH_TOKEN --repo kalw/ha-stats-lake --body "$(gh auth token)"
+```
+
+Or via the UI: Repository → Settings → Secrets and variables → Actions →
+**New repository secret**:
 
 | Name             | Value                                         |
 | ---------------- | --------------------------------------------- |
