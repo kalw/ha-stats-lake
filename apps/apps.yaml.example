@@ -1,0 +1,28 @@
+ha_stats:
+  module: ha_stats
+  class: HaStats
+
+  # Local working directory for CSV files (write-ahead log + cold backup source).
+  # Must be writable by the AppDaemon addon/container.
+  csv_dir: /conf/ha_stats_data
+
+  # Group helper that lists the entities to track.
+  # Create via: Settings > Devices & services > Helpers > + Create helper > Group > Entity
+  group_entity: group.ha_stats_tracked_entities
+
+  # How often to sample tracked entities, in seconds (default 1800 = 30 min)
+  sample_interval_seconds: 1800
+
+  # Daily job schedule (24h HH:MM:SS, local AppDaemon timezone)
+  consolidate_time: "02:00:00"
+  onedrive_sync_time: "03:00:00"
+
+  # --- Cloudflare R2 / DuckLake (optional — leave r2_bucket empty to disable) ---
+  r2_bucket: "s3://ha-stats/lake/"
+  r2_endpoint: "https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com"
+  r2_key_id: "YOUR_R2_ACCESS_KEY_ID"
+  r2_secret: "YOUR_R2_SECRET_ACCESS_KEY"
+
+  # --- OneDrive cold backup via rclone (optional — leave empty to disable) ---
+  # Configure the remote first with: rclone config
+  onedrive_remote: "onedrive:ha-backup"
