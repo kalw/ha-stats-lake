@@ -1,10 +1,11 @@
+---
 name: HA Stats Lake
 description: >-
   Long-term storage for Home Assistant sensor data. Samples a Group helper
   every 30 minutes to per-entity monthly CSVs, then consolidates nightly into
   a DuckLake (Parquet) on Cloudflare R2 and optionally syncs raw CSVs via
   rclone.
-version: "0.1.0"
+version: "dev"
 slug: ha_stats_lake
 url: https://github.com/kalw/ha-stats-lake
 
@@ -15,14 +16,8 @@ homeassistant_api: true
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
 
 init: false
-
-map:
-  - data:rw
 
 options:
   group_entity: group.ha_stats_tracked_entities

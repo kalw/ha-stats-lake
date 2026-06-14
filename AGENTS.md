@@ -27,9 +27,9 @@ ha_stats/               ← the add-on directory (slug: ha_stats_lake)
 
 The HA Supervisor injects two things into the container:
 
-| Name | Value |
-|------|-------|
-| `SUPERVISOR_TOKEN` | bearer token for `http://supervisor/core/api/` |
+| Name                 | Value                                                     |
+| -------------------- | --------------------------------------------------------- |
+| `SUPERVISOR_TOKEN`   | bearer token for `http://supervisor/core/api/`            |
 | `/data/options.json` | user config from the HA UI (matches `config.yaml` schema) |
 
 Data is persisted to `/data/ha_stats_data/` (the add-on's writable `/data` volume).
@@ -63,6 +63,7 @@ docker run --rm ha-stats-lake:dev python -c "import ha_stats; print('ok')"
 ```
 
 GitHub Actions:
+
 - `ci.yaml` — ruff lint + multi-arch Docker build (no push) on every PR and
   every push to `main`. Targets: `linux/amd64`, `linux/arm64`, `linux/arm/v7`.
 - `publish-docker.yaml` — pushes
@@ -85,14 +86,14 @@ below.
 <type>/<short-description>
 ```
 
-| Type | When to use |
-|------|-------------|
-| `feat` | new user-facing behaviour |
-| `fix` | bug fix |
-| `ci` | workflow / pipeline changes |
-| `docs` | documentation only |
+| Type       | When to use                           |
+| ---------- | ------------------------------------- |
+| `feat`     | new user-facing behaviour             |
+| `fix`      | bug fix                               |
+| `ci`       | workflow / pipeline changes           |
+| `docs`     | documentation only                    |
 | `refactor` | code restructure, no behaviour change |
-| `chore` | maintenance (deps, config, tooling) |
+| `chore`    | maintenance (deps, config, tooling)   |
 
 Examples: `feat/add-label-column`, `fix/consolidation-dedup`, `ci/arm-matrix`.
 
@@ -107,6 +108,7 @@ Every commit on a PR should follow this format:
 ```
 
 Examples:
+
 ```
 feat(csv): add entity label column to monthly files
 fix(consolidate): skip insert when no new CSV rows found
@@ -139,11 +141,11 @@ gh pr view --head "$(git branch --show-current)" \
   --json state,mergedAt --jq '"state: \(.state)  mergedAt: \(.mergedAt)"'
 ```
 
-| Output | What to do |
-|--------|-----------|
-| `state: OPEN` | Safe to push — continue normally. |
+| Output          | What to do                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| `state: OPEN`   | Safe to push — continue normally.                                                            |
 | `state: MERGED` | **Stop.** Create a new branch from `origin/main`, cherry-pick your commit(s), open a new PR. |
-| `state: CLOSED` | Same as MERGED — start fresh. |
+| `state: CLOSED` | Same as MERGED — start fresh.                                                                |
 
 If `gh pr view` errors (no PR found), the branch was never opened — push and
 run `gh pr create --fill`.
@@ -179,8 +181,8 @@ Releases are manual (no release-please bot). Steps:
 
 Repository → Settings → Secrets and variables → Actions → **New repository secret**:
 
-| Name | Value |
-|------|-------|
+| Name             | Value                                         |
+| ---------------- | --------------------------------------------- |
 | `DISPATCH_TOKEN` | PAT with `repo` scope on `kalw/hassio-addons` |
 
 `GITHUB_TOKEN` (auto-injected) covers only the GHCR push in this repo.

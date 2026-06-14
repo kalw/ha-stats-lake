@@ -40,30 +40,29 @@ To add or remove a tracked entity later, edit this group — no restart needed.
 
 ### How type/unit/label are determined
 
-| HA attribute | Result |
-|---|---|
-| domain is `binary_sensor`, `switch`, or `input_boolean` | type = `binary` |
-| `state_class` is `total` or `total_increasing` | type = `counter` |
-| anything else numeric | type = `gauge` |
-| `unit_of_measurement` | used as the unit |
-| `friendly_name` | used as the display label |
+| HA attribute                                            | Result                    |
+| ------------------------------------------------------- | ------------------------- |
+| domain is `binary_sensor`, `switch`, or `input_boolean` | type = `binary`           |
+| `state_class` is `total` or `total_increasing`          | type = `counter`          |
+| anything else numeric                                   | type = `gauge`            |
+| `unit_of_measurement`                                   | used as the unit          |
+| `friendly_name`                                         | used as the display label |
 
-Storage key is the entity_id with `.` replaced by `_`
-(e.g. `sensor.power_consumption` → `sensor_power_consumption`).
+Storage key is the entity*id with `.` replaced by `*`(e.g.`sensor.power_consumption`→`sensor_power_consumption`).
 
 ## Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `group_entity` | Entity ID of the Group helper | `group.ha_stats_tracked_entities` |
-| `sample_interval_seconds` | How often to sample | `1800` |
-| `consolidate_time` | When to run nightly DuckLake consolidation | `02:00:00` |
-| `onedrive_sync_time` | When to run nightly rclone sync | `03:00:00` |
-| `r2_bucket` | S3 URI of the R2 bucket (empty = disable) | — |
-| `r2_endpoint` | R2 endpoint URL | — |
-| `r2_key_id` | R2 Access Key ID | — |
-| `r2_secret` | R2 Secret Access Key | — |
-| `onedrive_remote` | rclone remote path (empty = disable) | — |
+| Option                    | Description                                | Default                           |
+| ------------------------- | ------------------------------------------ | --------------------------------- |
+| `group_entity`            | Entity ID of the Group helper              | `group.ha_stats_tracked_entities` |
+| `sample_interval_seconds` | How often to sample                        | `1800`                            |
+| `consolidate_time`        | When to run nightly DuckLake consolidation | `02:00:00`                        |
+| `onedrive_sync_time`      | When to run nightly rclone sync            | `03:00:00`                        |
+| `r2_bucket`               | S3 URI of the R2 bucket (empty = disable)  | —                                 |
+| `r2_endpoint`             | R2 endpoint URL                            | —                                 |
+| `r2_key_id`               | R2 Access Key ID                           | —                                 |
+| `r2_secret`               | R2 Secret Access Key                       | —                                 |
+| `onedrive_remote`         | rclone remote path (empty = disable)       | —                                 |
 
 CSV data is persisted to `/data/ha_stats_data/` inside the add-on's data volume.
 
