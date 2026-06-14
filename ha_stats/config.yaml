@@ -3,8 +3,8 @@ name: HA Stats Lake
 description: >-
   Long-term storage for Home Assistant sensor data. Samples a Group helper
   every 30 minutes to per-entity monthly CSVs, then consolidates nightly into
-  a DuckLake (Parquet) on Cloudflare R2 and optionally syncs raw CSVs via
-  rclone.
+  a DuckLake (Parquet) on any S3-compatible store and optionally syncs raw
+  CSVs to any rclone remote.
 version: "dev"
 slug: ha_stats_lake
 url: https://github.com/kalw/ha-stats-lake
@@ -23,20 +23,20 @@ options:
   group_entity: group.ha_stats_tracked_entities
   sample_interval_seconds: 1800
   consolidate_time: "02:00:00"
-  onedrive_sync_time: "03:00:00"
-  r2_bucket: ""
-  r2_endpoint: ""
-  r2_key_id: ""
-  r2_secret: ""
-  onedrive_remote: ""
+  rclone_sync_time: "03:00:00"
+  s3_bucket: ""
+  s3_endpoint: ""
+  s3_key_id: ""
+  s3_secret: ""
+  rclone_remote: ""
 
 schema:
   group_entity: str
   sample_interval_seconds: int
   consolidate_time: str
-  onedrive_sync_time: str
-  r2_bucket: str
-  r2_endpoint: str
-  r2_key_id: str
-  r2_secret: str
-  onedrive_remote: str
+  rclone_sync_time: str
+  s3_bucket: str
+  s3_endpoint: str
+  s3_key_id: str
+  s3_secret: str
+  rclone_remote: str

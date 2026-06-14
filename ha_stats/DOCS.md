@@ -1,17 +1,17 @@
 # HA Stats Lake — Documentation
 
 Samples a Group helper's entities every 30 minutes to flat per-entity monthly
-CSV files, then nightly consolidates into a DuckLake (Parquet) on Cloudflare R2
-and optionally syncs raw CSVs via rclone.
+CSV files, then nightly consolidates into a DuckLake (Parquet) on any
+S3-compatible object store and optionally syncs raw CSVs to any rclone remote.
 
 ```
 Home Assistant (ha_stats_lake add-on)
   ├─ every 30 min  → sample tracked entities → CSV (/data/ha_stats_data/)
-  ├─ nightly        → consolidate CSV → DuckLake (Parquet) on R2
-  └─ nightly        → rclone sync CSV → cold backup remote
+  ├─ nightly        → consolidate CSV → DuckLake (Parquet) on S3-compatible store
+  └─ nightly        → rclone sync CSV → any rclone remote (cold backup)
 
 Your laptop (on demand)
-  └─ duckdb -ui  → query the DuckLake on R2 directly
+  └─ duckdb -ui  → query the DuckLake on S3 directly
 ```
 
 ## Installation
@@ -52,37 +52,59 @@ Storage key is the entity*id with `.` replaced by `*`(e.g.`sensor.power_consumpt
 
 ## Configuration
 
-| Option                    | Description                                | Default                           |
-| ------------------------- | ------------------------------------------ | --------------------------------- |
-| `group_entity`            | Entity ID of the Group helper              | `group.ha_stats_tracked_entities` |
-| `sample_interval_seconds` | How often to sample                        | `1800`                            |
-| `consolidate_time`        | When to run nightly DuckLake consolidation | `02:00:00`                        |
-| `onedrive_sync_time`      | When to run nightly rclone sync            | `03:00:00`                        |
-| `r2_bucket`               | S3 URI of the R2 bucket (empty = disable)  | —                                 |
-| `r2_endpoint`             | R2 endpoint URL                            | —                                 |
-| `r2_key_id`               | R2 Access Key ID                           | —                                 |
-| `r2_secret`               | R2 Secret Access Key                       | —                                 |
-| `onedrive_remote`         | rclone remote path (empty = disable)       | —                                 |
+| Option                    | Description                                           | Default                           |
+| ------------------------- | ----------------------------------------------------- | --------------------------------- |
+| `group_entity`            | Entity ID of the Group helper                         | `group.ha_stats_tracked_entities` |
+| `sample_interval_seconds` | How often to sample (seconds)                         | `1800`                            |
+| `consolidate_time`        | When to run nightly DuckLake consolidation (HH:MM:SS) | `02:00:00`                        |
+| `rclone_sync_time`        | When to run nightly rclone sync (HH:MM:SS)            | `03:00:00`                        |
+| `s3_bucket`               | S3 URI of the bucket (empty = disable consolidation)  | —                                 |
+| `s3_endpoint`             | S3-compatible endpoint URL                            | —                                 |
+| `s3_key_id`               | S3 Access Key ID                                      | —                                 |
+| `s3_secret`               | S3 Secret Access Key                                  | —                                 |
+| `rclone_remote`           | rclone remote path (empty = disable sync)             | —                                 |
 
 CSV data is persisted to `/data/ha_stats_data/` inside the add-on's data volume.
 
-## (Optional) Cloudflare R2 setup
+## (Optional) S3-compatible object store setup
+
+Any S3-compatible store works: Cloudflare R2, AWS S3, MinIO, Backblaze B2, etc.
+
+### Example: Cloudflare R2
 
 1. Create a bucket (e.g. `ha-stats`) in the Cloudflare dashboard under **R2**.
 2. Create an API token with **read & write** access. Note the Access Key ID,
    Secret Access Key, and your Account ID.
-3. Set `r2_bucket` to `s3://ha-stats/lake/`, `r2_endpoint` to
-   `https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com`, and fill in the key fields.
+3. Set:
+   - `s3_bucket` → `s3://ha-stats/lake/`
+   - `s3_endpoint` → `https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com`
+   - `s3_key_id` → your Access Key ID
+   - `s3_secret` → your Secret Access Key
+
+### Example: AWS S3
+
+1. Create a bucket and an IAM user with `s3:GetObject`, `s3:PutObject`,
+   `s3:ListBucket` permissions.
+2. Set:
+   - `s3_bucket` → `s3://my-bucket/ha-stats/lake/`
+   - `s3_endpoint` → `https://s3.eu-west-1.amazonaws.com` (or leave empty for
+     the default AWS endpoint)
+   - `s3_key_id` / `s3_secret` → your IAM access key pair
 
 The first nightly run creates the DuckLake catalog and table automatically.
 
 ## (Optional) rclone cold backup
 
+Any rclone remote works: OneDrive, Google Drive, Dropbox, SFTP, etc.
+
 1. On any machine, run `rclone config` and create a remote following the
    [rclone docs](https://rclone.org/docs/).
 2. Copy `rclone.conf` into the add-on data volume at
    `/data/.config/rclone/rclone.conf`.
-3. Set `onedrive_remote` to e.g. `onedrive:ha-backup`.
+3. Set `rclone_remote` to the remote path, e.g.:
+   - `onedrive:ha-backup` (OneDrive)
+   - `gdrive:ha-backup` (Google Drive)
+   - `sftp-nas:/backups/ha` (SFTP)
 
 ## Visualizing the data
 
@@ -98,16 +120,16 @@ In the SQL console:
 INSTALL ducklake;
 LOAD ducklake;
 
-CREATE SECRET r2 (
+CREATE SECRET s3_store (
     TYPE S3,
-    KEY_ID '<your-r2-access-key-id>',
-    SECRET '<your-r2-secret-access-key>',
-    ENDPOINT '<your-account-id>.r2.cloudflarestorage.com',
+    KEY_ID '<your-s3-access-key-id>',
+    SECRET '<your-s3-secret-access-key>',
+    ENDPOINT '<your-s3-endpoint-without-https>',
     REGION 'auto'
 );
 
-ATTACH 'ducklake:s3://ha-stats/lake/catalog.duckdb' AS lake (
-    DATA_PATH 's3://ha-stats/lake/data/'
+ATTACH 'ducklake:s3://your-bucket/lake/catalog.duckdb' AS lake (
+    DATA_PATH 's3://your-bucket/lake/data/'
 );
 ```
 
@@ -136,7 +158,7 @@ GROUP BY 1 ORDER BY 1;
 
 - **No data appearing** — check the add-on log for `sampled N entities`. If
   `N` is 0, verify the group helper exists and has members.
-- **Consolidation errors** — usually R2 credentials or bucket path. Test the
+- **Consolidation errors** — usually S3 credentials or bucket path. Test the
   `ATTACH` statement manually in a local `duckdb` shell first.
 - **rclone errors** — verify `rclone.conf` is at
-  `/data/.config/rclone/rclone.conf` and the remote name matches `onedrive_remote`.
+  `/data/.config/rclone/rclone.conf` and the remote name matches `rclone_remote`.

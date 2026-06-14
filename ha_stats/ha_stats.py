@@ -42,7 +42,7 @@ class HaStats:
         self.group_entity: str = cfg.get("group_entity", "group.ha_stats_tracked_entities")
         self.sample_interval: int = int(cfg.get("sample_interval_seconds", 1800))
         self.consolidate_time: str = cfg.get("consolidate_time", "02:00:00")
-        self.onedrive_sync_time: str = cfg.get("onedrive_sync_time", "03:00:00")
+        self.rclone_sync_time: str = cfg.get("rclone_sync_time", "03:00:00")
 
         self._token = os.environ["SUPERVISOR_TOKEN"]
         self._headers = {"Authorization": f"Bearer {self._token}"}
@@ -129,11 +129,11 @@ class HaStats:
 
             log.info("sampled %d entities", len(entities))
 
-    # ── DuckDB consolidation → DuckLake on R2 ─────────────────────────────
+    # ── DuckDB consolidation → DuckLake on S3-compatible store ────────────
 
     def consolidate(self) -> None:
-        if not self.cfg.get("r2_bucket"):
-            log.info("r2_bucket not configured, skipping consolidation")
+        if not self.cfg.get("s3_bucket"):
+            log.info("s3_bucket not configured, skipping consolidation")
             return
         try:
             import duckdb
@@ -141,21 +141,23 @@ class HaStats:
             log.error("duckdb not installed, skipping consolidation")
             return
 
-        r2 = self.cfg
+        cfg = self.cfg
+        # Strip https:// from endpoint — DuckDB expects bare hostname
+        endpoint = cfg["s3_endpoint"].replace("https://", "").replace("http://", "")
         sql = f"""
 INSTALL ducklake;
 LOAD ducklake;
 
-CREATE OR REPLACE SECRET r2 (
+CREATE OR REPLACE SECRET s3_store (
     TYPE S3,
-    KEY_ID     '{r2["r2_key_id"]}',
-    SECRET     '{r2["r2_secret"]}',
-    ENDPOINT   '{r2["r2_endpoint"].replace("https://", "")}',
+    KEY_ID     '{cfg["s3_key_id"]}',
+    SECRET     '{cfg["s3_secret"]}',
+    ENDPOINT   '{endpoint}',
     REGION     'auto'
 );
 
-ATTACH IF NOT EXISTS 'ducklake:{r2["r2_bucket"]}catalog.duckdb' AS lake (
-    DATA_PATH '{r2["r2_bucket"]}data/'
+ATTACH IF NOT EXISTS 'ducklake:{cfg["s3_bucket"]}catalog.duckdb' AS lake (
+    DATA_PATH '{cfg["s3_bucket"]}data/'
 );
 
 CREATE TABLE IF NOT EXISTS lake.stats (
@@ -180,14 +182,14 @@ WHERE ts::TIMESTAMPTZ > (
 """
         try:
             duckdb.execute(sql)
-            log.info("R2 / DuckLake consolidation done")
+            log.info("S3 / DuckLake consolidation done")
         except Exception as e:
             log.error("consolidation failed: %s", e)
 
-    # ── rclone sync → OneDrive (cold backup) ──────────────────────────────
+    # ── rclone sync → any remote (cold backup) ────────────────────────────
 
-    def sync_onedrive(self) -> None:
-        remote = self.cfg.get("onedrive_remote")
+    def sync_rclone(self) -> None:
+        remote = self.cfg.get("rclone_remote")
         if not remote:
             return
         try:
@@ -198,9 +200,9 @@ WHERE ts::TIMESTAMPTZ > (
             if r.returncode != 0:
                 log.error("rclone error: %s", r.stderr)
             else:
-                log.info("OneDrive sync done")
+                log.info("rclone sync done → %s", remote)
         except FileNotFoundError:
-            log.error("rclone binary not found, skipping OneDrive sync")
+            log.error("rclone binary not found, skipping sync")
         except Exception as e:
             log.error("rclone failed: %s", e)
 
@@ -226,11 +228,11 @@ WHERE ts::TIMESTAMPTZ > (
             await asyncio.sleep(self._seconds_until(self.consolidate_time))
             await loop.run_in_executor(None, self.consolidate)
 
-    async def _run_onedrive(self) -> None:
+    async def _run_rclone(self) -> None:
         loop = asyncio.get_running_loop()
         while True:
-            await asyncio.sleep(self._seconds_until(self.onedrive_sync_time))
-            await loop.run_in_executor(None, self.sync_onedrive)
+            await asyncio.sleep(self._seconds_until(self.rclone_sync_time))
+            await loop.run_in_executor(None, self.sync_rclone)
 
     async def run(self) -> None:
         log.info(
@@ -240,7 +242,7 @@ WHERE ts::TIMESTAMPTZ > (
         await asyncio.gather(
             self._run_sampler(),
             self._run_consolidator(),
-            self._run_onedrive(),
+            self._run_rclone(),
         )
 
 

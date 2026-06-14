@@ -5,7 +5,8 @@ Guidance for AI coding agents (and humans) working in this repo.
 ## What this is
 
 A Home Assistant add-on that samples sensor entities to flat per-entity monthly
-CSVs and consolidates them nightly into a DuckLake (Parquet) on Cloudflare R2.
+CSVs and consolidates them nightly into a DuckLake (Parquet) on any
+S3-compatible object store (Cloudflare R2, AWS S3, MinIO, …).
 Optionally syncs the raw CSVs to any `rclone` remote as a cold backup.
 
 ## Repository layout
@@ -40,12 +41,12 @@ Never hardcode paths outside `/data/`.
 - **No AppDaemon** — the add-on talks to HA directly via `aiohttp`; do not
   re-introduce `adbase` or AppDaemon scheduler primitives.
 - **Asyncio for scheduling** — `_run_sampler`, `_run_consolidator`, and
-  `_run_onedrive` are long-running coroutines gathered in `HaStats.run()`.
+  `_run_rclone` are long-running coroutines gathered in `HaStats.run()`.
   Blocking work (DuckDB, rclone) is offloaded to `run_in_executor`.
 - **Config from `/data/options.json`** — all tunable values live there; never
   add env-var config that bypasses the HA UI.
-- **Optional features degrade gracefully** — if `r2_bucket` or
-  `onedrive_remote` is empty the corresponding path logs an info message and
+- **Optional features degrade gracefully** — if `s3_bucket` or
+  `rclone_remote` is empty the corresponding path logs an info message and
   returns; it must never crash the main loop.
 
 ## Build, container & CI
