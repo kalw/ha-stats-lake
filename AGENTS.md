@@ -23,6 +23,7 @@ ha_stats/                                  ← the add-on directory (slug: ha_st
 .github/workflows/
   ci.yaml                                  ← delegates to hassio-addons/workflows addon-ci on every PR/push
   deploy.yaml                              ← delegates to hassio-addons/workflows addon-deploy on published releases
+  deploy-edge.yaml                         ← triggers edge channel update on every push to main
 ```
 
 ## Add-on runtime contract
@@ -72,13 +73,20 @@ docker run --rm ha-stats-lake:dev python -c "import ha_stats; print('ok')"
 
 GitHub Actions:
 
-- `ci.yaml` — delegates to `hassio-addons/workflows/.github/workflows/addon-ci.yaml@main`.
+All three workflow files pin the shared workflow to a commit hash (not `@main`)
+to satisfy zizmor's unpinned-uses check, with a `# yamllint disable-line
+rule:line-length` comment above the `uses:` line.
+
+- `ci.yaml` — delegates to `hassio-addons/workflows/.github/workflows/addon-ci.yaml` (pinned).
   Runs linters (yamllint, prettier, hadolint, shellcheck), validates the HA addon
   manifest, and performs Docker builds (no push) for `aarch64` and `amd64` on
   every PR and push to `main`.
-- `deploy.yaml` — delegates to `hassio-addons/workflows/.github/workflows/addon-deploy.yaml@main`.
-  Fires only on **published** GitHub Releases; pushes the multi-arch image to
-  GHCR and triggers `kalw/hassio-addons` via `repository_dispatch`.
+- `deploy-edge.yaml` — fires on every push to `main`; delegates to
+  `addon-deploy.yaml` with `repository_edge: "hassio-addons-edge"`. Triggers
+  `kalw/hassio-addons-edge` via `repository_dispatch` to pull the latest edge build.
+- `deploy.yaml` — fires only on **published** GitHub Releases; delegates to
+  `addon-deploy.yaml` with `repository: "hassio-addons"`. Pushes the multi-arch
+  image to GHCR and triggers `kalw/hassio-addons` via `repository_dispatch`.
 
 Supported architectures: **aarch64**, **amd64**. The deprecated arches
 (`armhf`, `armv7`, `i386`) were dropped in HA 2025.12 and must not be
