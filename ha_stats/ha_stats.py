@@ -8,6 +8,7 @@ Config is read from /data/options.json (written by the HA UI from config.yaml sc
 Data is persisted to /data/ha_stats_data (the add-on's /data volume).
 """
 
+import argparse
 import asyncio
 import csv
 import datetime
@@ -27,9 +28,34 @@ CONFIG_PATH = Path("/data/options.json")
 DATA_DIR = Path("/data/ha_stats_data")
 HA_URL = "http://supervisor/core"
 
+# Environment variable → config key mapping (HA_STATS_* overrides options.json)
+_ENV_MAP = {
+    "HA_STATS_S3_BUCKET": "s3_bucket",
+    "HA_STATS_S3_ENDPOINT": "s3_endpoint",
+    "HA_STATS_S3_KEY_ID": "s3_key_id",
+    "HA_STATS_S3_SECRET": "s3_secret",
+    "HA_STATS_RCLONE_REMOTE": "rclone_remote",
+    "HA_STATS_SAMPLE_INTERVAL": "sample_interval_seconds",
+    "HA_STATS_CONSOLIDATE_TIME": "consolidate_time",
+    "HA_STATS_RCLONE_SYNC_TIME": "rclone_sync_time",
+    # comma-separated list: HA_STATS_TRACKED_ENTITIES=sensor.a,sensor.b
+    "HA_STATS_TRACKED_ENTITIES": "tracked_entities",
+}
 
-def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text())
+
+def load_config(path: Path | None = None) -> dict:
+    cfg = json.loads((path or CONFIG_PATH).read_text())
+    for env_key, cfg_key in _ENV_MAP.items():
+        val = os.environ.get(env_key)
+        if val is None:
+            continue
+        if cfg_key == "tracked_entities":
+            cfg[cfg_key] = [e.strip() for e in val.split(",") if e.strip()]
+        elif cfg_key == "sample_interval_seconds":
+            cfg[cfg_key] = int(val)
+        else:
+            cfg[cfg_key] = val
+    return cfg
 
 
 class HaStats:
@@ -244,6 +270,57 @@ WHERE ts::TIMESTAMPTZ > (
         )
 
 
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="HA Stats Lake add-on")
+    p.add_argument(
+        "--config",
+        metavar="PATH",
+        help="Path to options JSON (default: /data/options.json)",
+    )
+    sub = p.add_subparsers(dest="cmd")
+    sub.add_parser("run", help="Start the full loop (default)")
+    sub.add_parser("sample", help="Take one sample of all tracked entities and exit")
+    sub.add_parser("consolidate", help="Run DuckLake consolidation once and exit")
+
+    sync_p = sub.add_parser("sync", help="Run rclone sync once and exit")
+    sync_p.add_argument("--remote", help="rclone remote path (overrides config)")
+
+    exp = sub.add_parser("export", help="Export CSV data to S3/DuckLake")
+    exp.add_argument("--bucket", help="S3 bucket URI (e.g. s3://my-bucket/lake/)")
+    exp.add_argument("--endpoint", help="S3-compatible endpoint URL")
+    exp.add_argument("--key-id", dest="key_id", help="S3 Access Key ID")
+    exp.add_argument("--secret", help="S3 Secret Access Key")
+
+    return p.parse_args()
+
+
+def _cli_overrides(args: argparse.Namespace) -> dict:
+    """Collect non-None CLI flags into a config patch dict."""
+    candidates: dict = {}
+    if args.cmd == "export":
+        candidates = {
+            "s3_bucket": args.bucket,
+            "s3_endpoint": args.endpoint,
+            "s3_key_id": args.key_id,
+            "s3_secret": args.secret,
+        }
+    elif args.cmd == "sync":
+        candidates = {"rclone_remote": args.remote}
+    return {k: v for k, v in candidates.items() if v is not None}
+
+
 if __name__ == "__main__":
-    cfg = load_config()
-    asyncio.run(HaStats(cfg).run())
+    args = _parse_args()
+    cfg_path = Path(args.config) if args.config else None
+    # Priority: CLI flags > HA_STATS_* env vars > options.json
+    cfg = {**load_config(cfg_path), **_cli_overrides(args)}
+    ha = HaStats(cfg)
+
+    if args.cmd == "sample":
+        asyncio.run(ha.sample())
+    elif args.cmd in ("consolidate", "export"):
+        ha.consolidate()
+    elif args.cmd == "sync":
+        ha.sync_rclone()
+    else:
+        asyncio.run(ha.run())
