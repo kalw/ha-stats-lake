@@ -1,7 +1,7 @@
 # HA Stats Lake — Documentation
 
-Samples a Group helper's entities every 30 minutes to flat per-entity monthly
-CSV files, then nightly consolidates into a DuckLake (Parquet) on any
+Samples a configured list of entities every 30 minutes to flat per-entity
+monthly CSV files, then nightly consolidates into a DuckLake (Parquet) on any
 S3-compatible object store and optionally syncs raw CSVs to any rclone remote.
 
 ```
@@ -21,22 +21,21 @@ Your laptop (on demand)
 3. Add `https://github.com/kalw/hassio-addons` and click **Add**.
 4. Find **HA Stats Lake** in the store and click **Install**.
 
-## Create the entity group helper
+## Configure tracked entities
 
-This is the **only step you'll repeat** when adding or removing tracked sensors.
+1. Open the add-on **Configuration** tab in HA.
+2. Under `tracked_entities`, add the entity IDs you want recorded, e.g.:
+   ```yaml
+   tracked_entities:
+     - sensor.power_consumption
+     - sensor.energy_total
+     - sensor.temperature_living
+     - binary_sensor.door_front
+   ```
+3. Click **Save** and restart the add-on.
 
-1. Go to `Settings → Devices & services → Helpers`
-2. Click **+ Create helper → Group → Entity**
-3. Name it `HA Stats tracked entities`
-   (creates `group.ha_stats_tracked_entities`)
-4. Add every sensor / binary_sensor / switch you want recorded, e.g.:
-   - `sensor.power_consumption`
-   - `sensor.energy_total`
-   - `sensor.temperature_living`
-   - `binary_sensor.door_front`
-5. Save
-
-To add or remove a tracked entity later, edit this group — no restart needed.
+To add or remove a tracked entity later, edit the list in the Configuration tab
+and restart the add-on.
 
 ### How type/unit/label are determined
 
@@ -52,17 +51,17 @@ Storage key is the entity*id with `.` replaced by `*`(e.g.`sensor.power_consumpt
 
 ## Configuration
 
-| Option                    | Description                                           | Default                           |
-| ------------------------- | ----------------------------------------------------- | --------------------------------- |
-| `group_entity`            | Entity ID of the Group helper                         | `group.ha_stats_tracked_entities` |
-| `sample_interval_seconds` | How often to sample (seconds)                         | `1800`                            |
-| `consolidate_time`        | When to run nightly DuckLake consolidation (HH:MM:SS) | `02:00:00`                        |
-| `rclone_sync_time`        | When to run nightly rclone sync (HH:MM:SS)            | `03:00:00`                        |
-| `s3_bucket`               | S3 URI of the bucket (empty = disable consolidation)  | —                                 |
-| `s3_endpoint`             | S3-compatible endpoint URL                            | —                                 |
-| `s3_key_id`               | S3 Access Key ID                                      | —                                 |
-| `s3_secret`               | S3 Secret Access Key                                  | —                                 |
-| `rclone_remote`           | rclone remote path (empty = disable sync)             | —                                 |
+| Option                    | Description                                           | Default            |
+| ------------------------- | ----------------------------------------------------- | ------------------ |
+| `tracked_entities`        | List of HA entity IDs to sample                       | `[sensor.example]` |
+| `sample_interval_seconds` | How often to sample (seconds)                         | `1800`             |
+| `consolidate_time`        | When to run nightly DuckLake consolidation (HH:MM:SS) | `02:00:00`         |
+| `rclone_sync_time`        | When to run nightly rclone sync (HH:MM:SS)            | `03:00:00`         |
+| `s3_bucket`               | S3 URI of the bucket (empty = disable consolidation)  | —                  |
+| `s3_endpoint`             | S3-compatible endpoint URL                            | —                  |
+| `s3_key_id`               | S3 Access Key ID                                      | —                  |
+| `s3_secret`               | S3 Secret Access Key                                  | —                  |
+| `rclone_remote`           | rclone remote path (empty = disable sync)             | —                  |
 
 CSV data is persisted to `/data/ha_stats_data/` inside the add-on's data volume.
 
@@ -157,7 +156,7 @@ GROUP BY 1 ORDER BY 1;
 ## Troubleshooting
 
 - **No data appearing** — check the add-on log for `sampled N entities`. If
-  `N` is 0, verify the group helper exists and has members.
+  `N` is 0, verify `tracked_entities` is set in the Configuration tab.
 - **Consolidation errors** — usually S3 credentials or bucket path. Test the
   `ATTACH` statement manually in a local `duckdb` shell first.
 - **rclone errors** — verify `rclone.conf` is at

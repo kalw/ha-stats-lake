@@ -39,7 +39,7 @@ class HaStats:
         self.csv_dir = DATA_DIR
         self.csv_dir.mkdir(parents=True, exist_ok=True)
 
-        self.group_entity: str = cfg.get("group_entity", "group.ha_stats_tracked_entities")
+        self.tracked_entity_ids: list[str] = cfg.get("tracked_entities", [])
         self.sample_interval: int = int(cfg.get("sample_interval_seconds", 1800))
         self.consolidate_time: str = cfg.get("consolidate_time", "02:00:00")
         self.rclone_sync_time: str = cfg.get("rclone_sync_time", "03:00:00")
@@ -56,17 +56,15 @@ class HaStats:
                 return None
             return await resp.json()
 
-    # ── entity discovery via group helper ─────────────────────────────────
+    # ── entity metadata from config list ──────────────────────────────────
 
     async def tracked_entities(self, session: aiohttp.ClientSession) -> list[dict]:
-        group = await self._get_state(session, self.group_entity)
-        if not group:
-            log.warning("%s not found", self.group_entity)
+        if not self.tracked_entity_ids:
+            log.warning("tracked_entities is empty — add entity IDs in the add-on configuration")
             return []
 
-        entity_ids: list[str] = group.get("attributes", {}).get("entity_id", [])
         result = []
-        for entity_id in entity_ids:
+        for entity_id in self.tracked_entity_ids:
             state = await self._get_state(session, entity_id)
             if not state:
                 log.warning("could not read state for %s", entity_id)
@@ -236,8 +234,8 @@ WHERE ts::TIMESTAMPTZ > (
 
     async def run(self) -> None:
         log.info(
-            "ha_stats starting: csv_dir=%s, group=%s, interval=%ds",
-            self.csv_dir, self.group_entity, self.sample_interval,
+            "ha_stats starting: csv_dir=%s, entities=%d, interval=%ds",
+            self.csv_dir, len(self.tracked_entity_ids), self.sample_interval,
         )
         await asyncio.gather(
             self._run_sampler(),

@@ -15,8 +15,8 @@ Long-term storage for Home Assistant sensor data via DuckLake on S3-compatible s
 
 ## About
 
-Samples a Group helper's entities every 30 minutes to flat per-entity monthly
-CSV files, then nightly:
+Samples a configured list of entities every 30 minutes to flat per-entity
+monthly CSV files, then nightly:
 
 - consolidates new rows into a [DuckLake](https://ducklake.select/) (Parquet)
   on any **S3-compatible store** (Cloudflare R2, AWS S3, MinIO, …)
