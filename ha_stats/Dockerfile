@@ -13,6 +13,7 @@ RUN pip3 install --no-cache-dir --requirement /tmp/requirements.txt \
 
 COPY ha_stats.py /app/ha_stats.py
 COPY rootfs /
+RUN chmod a+x /etc/services.d/ha-stats/run
 
 ARG BUILD_ARCH
 ARG BUILD_DATE
