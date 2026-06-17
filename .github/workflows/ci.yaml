@@ -21,3 +21,13 @@ jobs:
   workflows:
     # yamllint disable-line rule:line-length
     uses: hassio-addons/workflows/.github/workflows/addon-ci.yaml@383c10d83acbe341acbb35a4a61bfd14827f00f0
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-test.txt
+      - run: pytest tests/ -v

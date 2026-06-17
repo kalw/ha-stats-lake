@@ -59,6 +59,26 @@ def load_config(path: Path | None = None) -> dict:
     return cfg
 
 
+def _normalise_bucket(bucket: str) -> str:
+    """Normalise s3_bucket to a trailing-slash S3 URI."""
+    bucket = bucket.strip()
+    if not bucket.startswith("s3://"):
+        bucket = f"s3://{bucket}/"
+    if not bucket.endswith("/"):
+        bucket += "/"
+    return bucket
+
+
+def _entity_type(entity_id: str, attributes: dict) -> str:
+    """Classify an HA entity as binary / counter / gauge."""
+    domain = entity_id.split(".")[0]
+    if domain in ("binary_sensor", "switch", "input_boolean"):
+        return "binary"
+    if attributes.get("state_class") in ("total", "total_increasing"):
+        return "counter"
+    return "gauge"
+
+
 class HaStats:
 
     def __init__(self, cfg: dict) -> None:
@@ -98,20 +118,10 @@ class HaStats:
                 continue
 
             a = state.get("attributes", {})
-            domain = entity_id.split(".")[0]
-            state_class = a.get("state_class", "")
-
-            if domain in ("binary_sensor", "switch", "input_boolean"):
-                etype = "binary"
-            elif state_class in ("total", "total_increasing"):
-                etype = "counter"
-            else:
-                etype = "gauge"
-
             result.append({
                 "key": entity_id.replace(".", "_"),
                 "ha_entity": entity_id,
-                "type": etype,
+                "type": _entity_type(entity_id, a),
                 "unit": a.get("unit_of_measurement", ""),
                 "label": a.get("friendly_name", entity_id),
             })
@@ -167,12 +177,7 @@ class HaStats:
             return
 
         cfg = self.cfg
-        # Normalise bucket: accept bare name ("ha-stats"), name+path, or full URI
-        bucket = cfg["s3_bucket"].strip()
-        if not bucket.startswith("s3://"):
-            bucket = f"s3://{bucket}/"
-        if not bucket.endswith("/"):
-            bucket += "/"
+        bucket = _normalise_bucket(cfg["s3_bucket"])
         # Strip https:// from endpoint — DuckDB expects bare hostname
         endpoint = cfg["s3_endpoint"].replace("https://", "").replace("http://", "")
         try:
