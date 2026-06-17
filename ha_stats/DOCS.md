@@ -57,13 +57,25 @@ Storage key is the entity*id with `.` replaced by `*`(e.g.`sensor.power_consumpt
 | `sample_interval_seconds` | How often to sample (seconds)                         | `1800`             |
 | `consolidate_time`        | When to run nightly DuckLake consolidation (HH:MM:SS) | `02:00:00`         |
 | `rclone_sync_time`        | When to run nightly rclone sync (HH:MM:SS)            | `03:00:00`         |
-| `s3_bucket`               | S3 URI of the bucket (empty = disable consolidation)  | —                  |
+| `s3_bucket`               | Bucket name (`ha-stats`) or full URI (`s3://ha-stats/lake/`) | —             |
 | `s3_endpoint`             | S3-compatible endpoint URL                            | —                  |
 | `s3_key_id`               | S3 Access Key ID                                      | —                  |
 | `s3_secret`               | S3 Secret Access Key                                  | —                  |
 | `rclone_remote`           | rclone remote path (empty = disable sync)             | —                  |
+| `csv_retention_days`      | Delete CSVs older than N days after consolidation (0 = keep forever) | `90` |
 
 CSV data is persisted to `/data/ha_stats_data/` inside the add-on's data volume.
+
+### Disk usage
+
+Each entity generates roughly **1 MB of CSV per year** at the default 30-minute
+interval. With the default `csv_retention_days: 90`, CSV files are automatically
+deleted after each successful nightly consolidation once they are older than 90
+days — the data is already safe in DuckLake on S3 at that point.
+
+If `s3_bucket` is not configured, consolidation never runs and CSVs accumulate
+indefinitely. In that case either reduce `sample_interval_seconds` or set
+`csv_retention_days` to a low value and accept that old data is discarded.
 
 ## (Optional) S3-compatible object store setup
 
@@ -127,7 +139,9 @@ CREATE SECRET s3_store (
     REGION 'auto'
 );
 
-ATTACH 'ducklake:s3://your-bucket/lake/catalog.duckdb' AS lake (
+-- catalog.duckdb lives in the add-on data volume; copy it locally first:
+-- docker cp <addon_container>:/data/ha_stats_data/catalog.duckdb ./catalog.duckdb
+ATTACH 'ducklake:catalog.duckdb' AS lake (
     DATA_PATH 's3://your-bucket/lake/data/'
 );
 ```

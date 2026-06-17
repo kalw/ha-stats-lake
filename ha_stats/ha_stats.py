@@ -38,6 +38,7 @@ _ENV_MAP = {
     "HA_STATS_SAMPLE_INTERVAL": "sample_interval_seconds",
     "HA_STATS_CONSOLIDATE_TIME": "consolidate_time",
     "HA_STATS_RCLONE_SYNC_TIME": "rclone_sync_time",
+    "HA_STATS_CSV_RETENTION_DAYS": "csv_retention_days",
     # comma-separated list: HA_STATS_TRACKED_ENTITIES=sensor.a,sensor.b
     "HA_STATS_TRACKED_ENTITIES": "tracked_entities",
 }
@@ -166,49 +167,79 @@ class HaStats:
             return
 
         cfg = self.cfg
+        # Normalise bucket: accept bare name ("ha-stats"), name+path, or full URI
+        bucket = cfg["s3_bucket"].strip()
+        if not bucket.startswith("s3://"):
+            bucket = f"s3://{bucket}/"
+        if not bucket.endswith("/"):
+            bucket += "/"
         # Strip https:// from endpoint — DuckDB expects bare hostname
         endpoint = cfg["s3_endpoint"].replace("https://", "").replace("http://", "")
-        sql = f"""
-INSTALL ducklake;
-LOAD ducklake;
-
-CREATE OR REPLACE SECRET s3_store (
-    TYPE S3,
-    KEY_ID     '{cfg["s3_key_id"]}',
-    SECRET     '{cfg["s3_secret"]}',
-    ENDPOINT   '{endpoint}',
-    REGION     'auto'
-);
-
-ATTACH IF NOT EXISTS 'ducklake:{cfg["s3_bucket"]}catalog.duckdb' AS lake (
-    DATA_PATH '{cfg["s3_bucket"]}data/'
-);
-
-CREATE TABLE IF NOT EXISTS lake.stats (
-    entity  VARCHAR,
-    ts      TIMESTAMPTZ,
-    value   DOUBLE
-);
-
-INSERT INTO lake.stats
-SELECT
-    regexp_extract(filename, '.*/([^/]+)/\\d{{4}}-\\d{{2}}\\.csv$', 1) AS entity,
-    ts::TIMESTAMPTZ AS ts,
-    value::DOUBLE   AS value
-FROM read_csv(
-    '{self.csv_dir}/*/*.csv',
-    columns = {{'ts': 'VARCHAR', 'value': 'VARCHAR'}},
-    filename = true
-)
-WHERE ts::TIMESTAMPTZ > (
-    SELECT coalesce(max(ts), '1970-01-01'::TIMESTAMPTZ) FROM lake.stats
-);
-"""
         try:
-            duckdb.execute(sql)
-            log.info("S3 / DuckLake consolidation done")
+            con = duckdb.connect()
+            con.execute("INSTALL ducklake")
+            con.execute("LOAD ducklake")
+            con.execute(f"""
+                CREATE OR REPLACE SECRET s3_store (
+                    TYPE S3,
+                    KEY_ID   '{cfg["s3_key_id"]}',
+                    SECRET   '{cfg["s3_secret"]}',
+                    ENDPOINT '{endpoint}',
+                    REGION   'auto'
+                )
+            """)
+            catalog = self.csv_dir / "catalog.duckdb"
+            con.execute(f"""
+                ATTACH IF NOT EXISTS 'ducklake:{catalog}' AS lake (
+                    DATA_PATH '{bucket}data/'
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS lake.stats (
+                    entity  VARCHAR,
+                    ts      TIMESTAMPTZ,
+                    value   DOUBLE
+                )
+            """)
+            con.execute(f"""
+                INSERT INTO lake.stats
+                SELECT
+                    regexp_extract(filename, '.*/([^/]+)/\\d{{4}}-\\d{{2}}\\.csv$', 1) AS entity,
+                    ts::TIMESTAMPTZ AS ts,
+                    value::DOUBLE   AS value
+                FROM read_csv(
+                    '{self.csv_dir}/*/*.csv',
+                    columns = {{'ts': 'VARCHAR', 'value': 'VARCHAR'}},
+                    filename = true
+                )
+                WHERE ts::TIMESTAMPTZ > (
+                    SELECT coalesce(max(ts), '1970-01-01'::TIMESTAMPTZ) FROM lake.stats
+                )
+            """)
+            con.execute("CHECKPOINT lake")
+            con.close()
+            log.info("S3 / DuckLake consolidation done → %s", bucket)
+            self._cleanup_old_csvs()
         except Exception as e:
             log.error("consolidation failed: %s", e)
+
+    def _cleanup_old_csvs(self) -> None:
+        retention = int(self.cfg.get("csv_retention_days", 90))
+        if retention == 0:
+            return
+        cutoff = datetime.date.today() - datetime.timedelta(days=retention)
+        cutoff_ym = (cutoff.year, cutoff.month)
+        removed = 0
+        for csv_file in self.csv_dir.glob("*/*.csv"):
+            try:
+                y, m = map(int, csv_file.stem.split("-"))
+            except ValueError:
+                continue
+            if (y, m) < cutoff_ym:
+                csv_file.unlink()
+                removed += 1
+        if removed:
+            log.info("removed %d CSV files older than %d days", removed, retention)
 
     # ── rclone sync → any remote (cold backup) ────────────────────────────
 

@@ -30,6 +30,7 @@ options:
   s3_key_id: ""
   s3_secret: ""
   rclone_remote: ""
+  csv_retention_days: 90
 
 schema:
   tracked_entities:
@@ -42,4 +43,5 @@ schema:
   s3_key_id: password
   s3_secret: password
   rclone_remote: str
+  csv_retention_days: int
   group_entity: str?
