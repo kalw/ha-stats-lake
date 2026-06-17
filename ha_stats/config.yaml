@@ -33,8 +33,7 @@ options:
 
 schema:
   tracked_entities:
-    - selector:
-        entity: {}
+    - str
   sample_interval_seconds: int
   consolidate_time: str
   rclone_sync_time: str
@@ -43,3 +42,4 @@ schema:
   s3_key_id: password
   s3_secret: password
   rclone_remote: str
+  group_entity: str?
