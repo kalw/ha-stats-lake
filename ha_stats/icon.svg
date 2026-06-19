@@ -1,0 +1,62 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" width="256" height="256">
+<title>HA Stats Lake logo</title>
+<defs>
+  <clipPath id="clip">
+    <rect width="256" height="256" rx="42"/>
+  </clipPath>
+</defs>
+
+<rect width="256" height="256" rx="42" fill="#0d1b3e"/>
+
+<g clip-path="url(#clip)">
+
+  <!-- Lake waves -->
+  <ellipse cx="128" cy="212" rx="148" ry="48" fill="#0a2a5e" opacity="0.7"/>
+  <ellipse cx="128" cy="226" rx="148" ry="48" fill="#0c3272" opacity="0.6"/>
+  <ellipse cx="128" cy="242" rx="148" ry="48" fill="#0e3d8a" opacity="0.5"/>
+  <path d="M-10 195 Q38 182 86 192 Q134 202 182 188 Q220 178 266 192 L266 260 L-10 260 Z" fill="#122f6e" opacity="0.55"/>
+  <path d="M-10 210 Q50 197 100 208 Q150 219 200 205 Q230 198 266 208 L266 260 L-10 260 Z" fill="#163a85" opacity="0.45"/>
+
+  <!-- Bar chart -->
+  <rect x="44" y="152" width="34" height="52" rx="5" fill="#2979c4"/>
+  <rect x="90" y="118" width="34" height="86" rx="5" fill="#1a6bb5"/>
+  <rect x="136" y="84" width="34" height="120" rx="5" fill="#1258a0"/>
+  <rect x="182" y="100" width="34" height="104" rx="5" fill="#0e4a8c"/>
+
+  <!-- Trend line -->
+  <polyline points="61,150 107,116 153,82 199,98" fill="none" stroke="#7ec8f0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="61" cy="150" r="6" fill="#b3e5fc"/>
+  <circle cx="107" cy="116" r="6" fill="#b3e5fc"/>
+  <circle cx="153" cy="82" r="6" fill="#ffffff"/>
+  <circle cx="199" cy="98" r="6" fill="#b3e5fc"/>
+  <circle cx="153" cy="82" r="10" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.5"/>
+
+  <!-- Timeline indicator (long-term storage) -->
+  <rect x="26" y="28" width="82" height="28" rx="6" fill="#0a2247"/>
+  <line x1="36" y1="42" x2="98" y2="42" stroke="#1a4a8a" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="36" cy="42" r="3" fill="#2979c4"/>
+  <circle cx="55" cy="42" r="3" fill="#2979c4"/>
+  <circle cx="74" cy="42" r="3" fill="#2979c4"/>
+  <circle cx="93" cy="42" r="3" fill="#2979c4"/>
+  <line x1="36" y1="36" x2="36" y2="40" stroke="#1a4a8a" stroke-width="1"/>
+  <line x1="55" y1="36" x2="55" y2="40" stroke="#1a4a8a" stroke-width="1"/>
+  <line x1="74" y1="36" x2="74" y2="40" stroke="#1a4a8a" stroke-width="1"/>
+  <line x1="93" y1="36" x2="93" y2="40" stroke="#1a4a8a" stroke-width="1"/>
+
+  <!-- Database cylinder (storage icon) -->
+  <ellipse cx="210" cy="42" rx="28" ry="7" fill="#0f2d5e" stroke="#2167a8" stroke-width="1.5"/>
+  <rect x="182" y="42" width="56" height="28" fill="#0f2d5e"/>
+  <rect x="183" y="42" width="54" height="28" fill="#0c2550"/>
+  <ellipse cx="210" cy="70" rx="28" ry="7" fill="#0f2d5e" stroke="#2167a8" stroke-width="1.5"/>
+  <ellipse cx="210" cy="56" rx="28" ry="7" fill="#112d5c" stroke="#1a5a9e" stroke-width="1"/>
+  <ellipse cx="210" cy="42" rx="28" ry="7" fill="#1a3f7a" stroke="#2979c4" stroke-width="1.5"/>
+  <rect x="183" y="28" width="54" height="14" fill="#122050"/>
+  <ellipse cx="210" cy="28" rx="28" ry="7" fill="#1e4a8a" stroke="#2979c4" stroke-width="1.5"/>
+
+  <!-- Clock face on top of cylinder -->
+  <circle cx="210" cy="28" r="10" fill="none" stroke="#7ec8f0" stroke-width="1.5" opacity="0.6"/>
+  <line x1="210" y1="28" x2="210" y2="22" stroke="#7ec8f0" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="210" y1="28" x2="214" y2="31" stroke="#7ec8f0" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+
+</g>
+</svg>
