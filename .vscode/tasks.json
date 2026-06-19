@@ -18,7 +18,7 @@
     {
       "label": "Build addon image (local dev)",
       "type": "shell",
-      "command": "ARCH=$(uname -m | sed 's/x86_64/amd64/;s/arm64/aarch64/') && BUILD=$(command -v podman 2>/dev/null || command -v docker) && $BUILD build --build-arg BUILD_FROM=ghcr.io/home-assistant/${ARCH}-base-python:3.12-alpine3.19 --build-arg BUILD_ARCH=${ARCH} --build-arg BUILD_VERSION=dev --build-arg BUILD_NAME='HA Stats Lake' --build-arg BUILD_DESCRIPTION='Long-term storage for HA sensor data' --build-arg BUILD_REF=$(git rev-parse --short HEAD) --build-arg BUILD_REPOSITORY=kalw/ha-stats-lake --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t ghcr.io/kalw/ha_stats_lake/${ARCH}:dev ha_stats/",
+      "command": "ARCH=$(uname -m | sed 's/x86_64/amd64/;s/arm64/aarch64/') && BUILD=$(command -v podman 2>/dev/null || command -v docker) && $BUILD build --build-arg BUILD_FROM=ghcr.io/home-assistant/${ARCH}-base-python:3.12-alpine3.19 --build-arg BUILD_ARCH=${ARCH} --build-arg BUILD_VERSION=dev --build-arg BUILD_NAME='HA Stats Lake' --build-arg BUILD_DESCRIPTION='Long-term storage for HA sensor data' --build-arg BUILD_REF=$(git rev-parse --short HEAD) --build-arg BUILD_REPOSITORY=kalw/hassio-addon-stats-lake --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t ghcr.io/kalw/ha_stats_lake/${ARCH}:dev ha_stats/",
       "group": "build",
       "presentation": {
         "reveal": "always",

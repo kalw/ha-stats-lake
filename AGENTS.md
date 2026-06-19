@@ -202,7 +202,7 @@ Steps:
 on `kalw/hassio-addons` — to trigger the repository updater.
 
 ```bash
-gh secret set DISPATCH_TOKEN --repo kalw/ha-stats-lake --body "$(gh auth token)"
+gh secret set DISPATCH_TOKEN --repo kalw/hassio-addon-stats-lake --body "$(gh auth token)"
 ```
 
 Or via the UI: Repository → Settings → Secrets and variables → Actions →

@@ -7,7 +7,7 @@ description: >-
   CSVs to any rclone remote.
 version: "dev"
 slug: ha_stats_lake
-url: https://github.com/kalw/ha-stats-lake
+url: https://github.com/kalw/hassio-addon-stats-lake
 
 image: ghcr.io/kalw/ha_stats_lake/{arch}
 
